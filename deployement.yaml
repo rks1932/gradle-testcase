@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: selenium-service
+spec:
+  selector:
+    app: selenium-pod  # Make sure this matches the label in your Pod definition
+  ports:
+  - name: hub-event-bus-publish
+    protocol: TCP
+    port: 4442
+    targetPort: 4442
+    nodePort: 30018  # Specify a NodePort value
+  - name: hub-event-bus-subscribe
+    protocol: TCP
+    port: 4443
+    targetPort: 4443
+    nodePort: 30019  # Specify a NodePort value
+  - name: hub-webdriver
+    protocol: TCP
+    port: 4444
+    targetPort: 4444
+    nodePort: 30020  # Specify a NodePort value
+  - name: node-vnc
+    protocol: TCP
+    port: 7900
+    targetPort: 7900
+    nodePort: 30021  # Specify a NodePort value
+  type: NodePort  # You can also use "LoadBalancer" type here depending on your cluster
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: selenium-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: selenium-pod
+  template:
+    metadata:
+      labels:
+        app: selenium-pod
+    spec:
+      containers:
+      - name: selenium-hub
+        image: selenium/hub:4.7.2-20221219
+        ports:
+        - containerPort: 4442
+        - containerPort: 4443
+        - containerPort: 4444
+      - name: selenium-node-chrome
+        image: selenium/node-chrome:4.7.2-20221219
+        securityContext:
+          capabilities:
+            add: ["SYS_ADMIN"]
+        resources:
+          limits:
+            memory: "2Gi"
+          requests:
+            memory: "2Gi"
+        env:
+          - name: SE_EVENT_BUS_HOST
+            value: localhost
+          - name: SE_EVENT_BUS_PUBLISH_PORT
+            value: "4442"
+          - name: SE_EVENT_BUS_SUBSCRIBE_PORT
+            value: "4443"
+          - name: SE_VNC_NO_PASSWORD
+            value: "1"
+          - name: SE_NODE_MAX_SESSIONS
+            value: "3"
+        ports:
+        - containerPort: 4444
+        - containerPort: 7900
